@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Tool Ghép Skin</title>
+
+<style>
+
+body{
+    font-family: Arial;
+    background:#f2f2f2;
+    text-align:center;
+}
+
+.container{
+    width:90%;
+    margin:auto;
+}
+
+.box{
+    background:white;
+    padding:20px;
+    margin:20px auto;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,0.1);
+}
+
+button{
+    padding:10px 20px;
+    border:none;
+    background:#4CAF50;
+    color:white;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:16px;
+}
+
+button:hover{
+    background:#45a049;
+}
+
+img{
+    margin:10px;
+    border-radius:8px;
+}
+
+.preview{
+    max-width:300px;
+}
+
+.skin-list{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+}
+
+.skin{
+    width:150px;
+    margin:10px;
+    border:3px solid white;
+}
+
+.result{
+    max-width:90%;
+}
+
+</style>
+</head>
+
+
+<body>
+
+<div class="container">
+
+<h1>Tool Ghép Skin Liên Quân</h1>
+
+
+<div class="box">
+
+<h3>Background</h3>
+
+<input type="file" id="bg">
+
+<br>
+
+<img id="bgPreview" class="preview">
+
+</div>
+
+
+
+<div class="box">
+
+<h3>Rate</h3>
+
+<input type="file" id="rate">
+
+<br>
+
+<img id="ratePreview" class="preview">
+
+</div>
+
+
+
+<div class="box">
+
+<h3>Shop</h3>
+
+<input type="file" id="shop" multiple>
+
+<div id="shopPreview" class="skin-list"></div>
+
+</div>
+
+
+
+<div class="box">
+
+<button onclick="cutSkin()">Cắt Skin</button>
+
+<h3>Skin đã cắt</h3>
+
+<div id="skinList" class="skin-list"></div>
+
+</div>
+
+
+
+<div class="box">
+
+<button onclick="merge()">Ghép Ảnh</button>
+
+<br><br>
+
+<div id="download"></div>
+
+<h3>Kết quả</h3>
+
+<img id="result" class="result">
+
+</div>
+
+
+</div>
+
+
+
+<script>
+
+let shopPaths = []
+
+
+
+/* =========================
+Upload Background
+========================= */
+
+document.getElementById("bg").onchange = async function(){
+
+let f = this.files[0]
+
+let form = new FormData()
+
+form.append("file",f)
+
+await fetch("/upload_bg",{method:"POST",body:form})
+
+document.getElementById("bgPreview").src = URL.createObjectURL(f)
+
+}
+
+
+
+/* =========================
+Upload Rate
+========================= */
+
+document.getElementById("rate").onchange = async function(){
+
+let f = this.files[0]
+
+let form = new FormData()
+
+form.append("file",f)
+
+await fetch("/upload_rate",{method:"POST",body:form})
+
+document.getElementById("ratePreview").src = URL.createObjectURL(f)
+
+}
+
+
+
+/* =========================
+Upload Shop
+========================= */
+
+document.getElementById("shop").onchange = async function(){
+
+let form = new FormData()
+
+let preview = document.getElementById("shopPreview")
+
+preview.innerHTML=""
+
+for(let f of this.files){
+
+form.append("files",f)
+
+let img = document.createElement("img")
+
+img.src = URL.createObjectURL(f)
+
+img.className="skin"
+
+preview.appendChild(img)
+
+}
+
+let r = await fetch("/upload_shop",{method:"POST",body:form})
+
+let data = await r.json()
+
+shopPaths = data.paths
+
+}
+
+
+
+/* =========================
+Cắt Skin
+========================= */
+
+async function cutSkin(){
+
+let r = await fetch("/cut_skin",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({paths:shopPaths})
+
+})
+
+let data = await r.json()
+
+let div = document.getElementById("skinList")
+
+div.innerHTML=""
+
+for(let s of data.skins){
+
+let box = document.createElement("div")
+box.className = "skin-box"
+
+let img = document.createElement("img")
+img.src = "/skins/" + s
+img.className = "skin"
+
+box.draggable = true
+box.dataset.name = s
+
+box.addEventListener("dragstart", dragStart)
+box.addEventListener("dragover", dragOver)
+box.addEventListener("drop", drop)
+
+let remove = document.createElement("div")
+remove.className = "remove"
+remove.innerHTML = "×"
+
+remove.onclick = function(){
+box.remove()
+}
+
+box.appendChild(img)
+box.appendChild(remove)
+
+div.appendChild(box)
+
+}
+
+}
+
+
+
+/* =========================
+Ghép ảnh
+========================= */
+
+async function merge(){
+
+let skins = []
+
+document.querySelectorAll("#skinList .skin-box").forEach(box=>{
+skins.push(box.dataset.name)
+})
+
+let r = await fetch("/merge",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({skins:skins})
+})
+
+let data = await r.json()
+
+document.getElementById("result").src = data.image + "?" + Date.now()
+
+document.getElementById("download").innerHTML =
+`<a href="${data.download}">
+<button>Tải ảnh xuống</button>
+</a>`
+
+}
+let dragItem = null
+
+function dragStart(){
+    dragItem = this
+}
+
+function dragOver(e){
+    e.preventDefault()
+}
+
+function drop(e){
+
+    e.preventDefault()
+
+    if(dragItem !== this){
+
+        let parent = this.parentNode
+
+        parent.insertBefore(dragItem, this)
+
+    }
+
+}
+
+</script>
+</body>
+</html>
