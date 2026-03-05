@@ -199,42 +199,18 @@ document.getElementById("shop").onchange = async function(){
 
 let form = new FormData()
 let preview = document.getElementById("shopPreview")
-preview.innerHTML=""
+
+preview.innerHTML="Đang upload..."
 
 for(let f of this.files){
-form.append("files",f)
+    form.append("files",f)
 }
 
 console.log("Uploading shop...")
 
 let r = await fetch("/upload_shop",{
-method:"POST",
-body:form
-})
-
-let data = await r.json()
-
-console.log("Upload shop:",data)
-
-shopPaths = data.paths || []
-
-/* preview sau khi upload xong */
-
-for(let f of this.files){
-
-let img = document.createElement("img")
-img.src = URL.createObjectURL(f)
-img.className="skin"
-
-preview.appendChild(img)
-
-}
-
-}
-
-let r = await fetch("/upload_shop",{
-method:"POST",
-body:form
+    method:"POST",
+    body:form
 })
 
 let data = await r.json()
@@ -242,14 +218,27 @@ let data = await r.json()
 console.log("Upload shop:",data)
 
 if(data.paths){
-shopPaths = data.paths
+    shopPaths = data.paths
 }else{
-alert("Upload shop lỗi")
+    alert("Upload shop lỗi")
+    return
+}
+
+/* preview sau khi upload xong */
+
+preview.innerHTML=""
+
+for(let f of this.files){
+
+    let img = document.createElement("img")
+    img.src = URL.createObjectURL(f)
+    img.className="skin"
+
+    preview.appendChild(img)
+
 }
 
 }
-
-
 
 /* =========================
 Cắt Skin
@@ -261,7 +250,6 @@ if(shopPaths.length === 0){
 alert("Chưa upload ảnh shop")
 return
 }
-preview.innerHTML="Đang upload..."
 let r = await fetch("/cut_skin",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
