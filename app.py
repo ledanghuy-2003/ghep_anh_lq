@@ -98,10 +98,11 @@ def upload_shop():
     for f in files:
 
         filename = str(uuid.uuid4()) + ".png"
-
         path = os.path.join(UPLOAD, filename)
 
         f.save(path)
+
+        print("Saved shop:", path)
 
         paths.append(path)
 

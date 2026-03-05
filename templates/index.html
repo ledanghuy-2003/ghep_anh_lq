@@ -199,7 +199,6 @@ Upload Shop
 document.getElementById("shop").onchange = async function(){
 
 let form = new FormData()
-
 let preview = document.getElementById("shopPreview")
 
 preview.innerHTML=""
@@ -209,20 +208,27 @@ for(let f of this.files){
 form.append("files",f)
 
 let img = document.createElement("img")
-
 img.src = URL.createObjectURL(f)
-
 img.className="skin"
 
 preview.appendChild(img)
 
 }
 
-let r = await fetch("/upload_shop",{method:"POST",body:form})
+let r = await fetch("/upload_shop",{
+method:"POST",
+body:form
+})
 
 let data = await r.json()
 
+console.log("Upload shop:",data)
+
+if(data.paths){
 shopPaths = data.paths
+}else{
+alert("Upload shop lỗi")
+}
 
 }
 
@@ -234,15 +240,25 @@ Cắt Skin
 
 async function cutSkin(){
 
+if(shopPaths.length === 0){
+alert("Chưa upload ảnh shop")
+return
+}
+
 let r = await fetch("/cut_skin",{
-
 method:"POST",
-
 headers:{"Content-Type":"application/json"},
-
 body:JSON.stringify({paths:shopPaths})
-
 })
+
+let data = await r.json()
+
+console.log("Cut skin:",data)
+
+if(data.error){
+alert(data.error)
+return
+}
 
 let data = await r.json()
 
