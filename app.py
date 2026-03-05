@@ -7,6 +7,10 @@ import uuid
 
 app = Flask(__name__)
 
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("skins", exist_ok=True)
+os.makedirs("result", exist_ok=True)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 UPLOAD = os.path.join(BASE_DIR, "uploads")
@@ -174,6 +178,8 @@ def cut_skin():
                 cv2.imwrite(path, crop)
 
                 skins.append(name)
+    success = cv2.imwrite(path, img)
+    print("Saved:", success)
 
     return jsonify({"skins": skins})
 
