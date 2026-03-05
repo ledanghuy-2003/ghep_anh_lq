@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import os
 import uuid
+import tempfile
 
 app = Flask(__name__)
 
@@ -18,6 +19,7 @@ UPLOAD = os.path.join(BASE_DIR, "uploads")
 SKIN = os.path.join(BASE_DIR, "skins")
 RATE = os.path.join(BASE_DIR, "rate")
 RESULT = os.path.join(BASE_DIR, "result")
+temp_dir = tempfile.mkdtemp()
 
 for f in [UPLOAD, SKIN, RATE, RESULT]:
     os.makedirs(f, exist_ok=True)
@@ -114,75 +116,70 @@ def upload_shop():
 # =============================
 @app.route("/cut_skin", methods=["POST"])
 def cut_skin():
-
     global skins
     skins.clear()
-
+    
     template_path = os.path.join(BASE_DIR, "sohuu.png")
-
     template = cv2.imread(template_path)
-
+    
     if template is None:
-        return jsonify({"error": "Không tìm thấy sohuu.png"})
-
+        return jsonify({"error": f"Không tìm thấy {template_path}"})
+    
     th, tw = template.shape[:2]
-
     skin_width = 330
     skin_height = 522
-
     xs = [699,1049,1399,1749,2099]
-
+    
     shop_paths = request.json["paths"]
-
+    
     for shop_path in shop_paths:
-
+        # Kiểm tra file tồn tại
+        if not os.path.exists(shop_path):
+            print(f"File không tồn tại: {shop_path}")
+            continue
+            
         img = cv2.imread(shop_path)
-
         if img is None:
+            print(f"Không đọc được ảnh: {shop_path}")
             continue
 
-        result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
-
-        loc = np.where(result >= 0.75)
-
-        points = list(zip(loc[1], loc[0]))
-
-        if len(points) == 0:
+        try:
+            result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
+            loc = np.where(result >= 0.75)
+            points = list(zip(loc[1], loc[0]))
+            
+            if len(points) == 0:
+                print(f"Không tìm thấy template trong ảnh: {shop_path}")
+                continue
+                
+        except Exception as e:
+            print(f"Lỗi khi xử lý ảnh {shop_path}: {str(e)}")
             continue
 
         points = sorted(points, key=lambda p: p[1])
-
         x_mid, y_mid = points[len(points)//2]
-
         offset = 604 - th
-
         top = y_mid - offset
 
         for x in xs:
-
             check = img[top+skin_height-20:top+skin_height+140, x:x+skin_width]
-
+            
             if check.size == 0:
                 continue
 
             res = cv2.matchTemplate(check, template, cv2.TM_CCOEFF_NORMED)
-
             score = np.max(res)
 
             if score > 0.45:
-
                 crop = img[top:top+skin_height, x:x+skin_width]
-
                 name = f"{uuid.uuid4()}.png"
-
                 path = os.path.join(SKIN, name)
-
                 cv2.imwrite(path, crop)
-
                 skins.append(name)
+    
     print("Shop paths:", shop_paths)
     print("Template shape:", template.shape)
-    print("Points:", len(points))
+    print("Skins found:", len(skins))
 
     return jsonify({"skins": skins})
 
