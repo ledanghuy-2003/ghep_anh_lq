@@ -252,7 +252,7 @@ def cut_skin():
                 cv2.imwrite(path, crop)
                 skins.append({
                     "name": name,
-                    "url": f"/skins/{get_user_id()}/{name}"
+                    "url": f"/skins/{session['uid']}/{name}"
                 })
     
     print("Shop paths:", shop_paths)
@@ -324,7 +324,6 @@ def merge():
     data = request.json or {}
     skins = data.get("skins", [])
     use_chest = data.get("ruong_cs", False)
-    use_email = data.get("email", False)
     if len(skins) == 0:
         return jsonify({"error":"Chưa có skin"})
 
@@ -389,25 +388,6 @@ def merge():
     border = 5
     start_x = left_margin
 
-    # ===== load email =====
-    email_img = None
-
-    if use_email:
-        email_path = os.path.join(BASE_DIR, "email.png")
-
-        if os.path.exists(email_path):
-
-            email_img = cv2.imread(email_path)
-
-            email_img = cv2.resize(email_img, (300,300))
-
-            email_img = cv2.copyMakeBorder(
-                email_img,
-                5,5,5,5,
-                cv2.BORDER_CONSTANT,
-                value=(255,255,255)
-            )
-
     # ===== load rương cs =====
     chest = None
 
@@ -463,10 +443,6 @@ def merge():
     # ===== load skin =====
     for name in skins:
 
-        if name is None or name == "":
-            print("Skin name lỗi:", name)
-            continue
-
         user_skin = get_user_dir(SKIN)
         path = os.path.join(user_skin, name)
         skin = cv2.imread(path)
@@ -495,42 +471,6 @@ def merge():
 
         bg[y:y+h, x:x+w] = skin
 
-    # ===== ghép email =====
-
-    if email_img is not None and len(skins_data) > 0:
-
-        first_skin = skins_data[0]
-
-        h, w = first_skin.shape[:2]
-
-        first_x = start_x
-        first_y = bg.shape[0] - h - bottom_margin
-
-        # nếu có giấy tuyệt sắc
-        if paper is not None:
-
-            email_x = paper_x + paper.shape[1] + 10
-            email_y = paper_y
-
-        # nếu có rương
-        elif chest is not None:
-
-            chest_x = first_x
-            chest_y = first_y - chest.shape[0] - 15
-
-            email_x = chest_x + chest.shape[1] + 10
-            email_y = chest_y
-
-        # nếu không có gì
-        else:
-
-            email_x = first_x
-            email_y = first_y - email_img.shape[0] - 15
-
-        bg[
-            email_y:email_y+email_img.shape[0],
-            email_x:email_x+email_img.shape[1]
-        ] = email_img
 
     # ===== ghép rương chung sức =====
     if chest is not None and len(skins_data) > 0:
