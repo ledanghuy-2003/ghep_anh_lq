@@ -1,12 +1,17 @@
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, session
+from flask import after_this_request
+import shutil
 from flask import send_from_directory
 import cv2
+cv2.setNumThreads(1)
+cv2.setUseOptimized(True)
 import numpy as np
 import os
 import uuid
 import tempfile
 
 app = Flask(__name__)
+app.secret_key = "secret123"
 
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("skins", exist_ok=True)
@@ -23,9 +28,17 @@ temp_dir = tempfile.mkdtemp()
 for f in [UPLOAD, SKIN, RATE, RESULT]:
     os.makedirs(f, exist_ok=True)
 
-bg_path = None
-skins = []
 
+def get_user_id():
+    if "uid" not in session:
+        session["uid"] = str(uuid.uuid4())
+    return session["uid"]
+
+def get_user_dir(folder):
+    uid = get_user_id()
+    path = os.path.join(folder, uid)
+    os.makedirs(path, exist_ok=True)
+    return path
 
 @app.route("/")
 def index():
@@ -38,17 +51,19 @@ def index():
 @app.route("/upload_bg", methods=["POST"])
 def upload_bg():
 
-    global bg_path
+    file = request.files.get("file")
 
-    file = request.files["file"]
+    if not file:
+        return "Không có file"
+
+    user_upload = get_user_dir(UPLOAD)
 
     filename = str(uuid.uuid4()) + ".png"
-
-    path = os.path.join(UPLOAD, filename)
+    path = os.path.join(user_upload, filename)
 
     file.save(path)
 
-    bg_path = path
+    session["bg_path"] = path
 
     return "ok"
 
@@ -59,10 +74,14 @@ def upload_bg():
 @app.route("/upload_rate", methods=["POST"])
 def upload_rate():
 
-    file = request.files["file"]
+    file = request.files.get("file")
+
+    if not file:
+        return "Không có file"
 
     filename = str(uuid.uuid4()) + ".png"
-    path = os.path.join(UPLOAD, filename)
+    user_upload = get_user_dir(UPLOAD)
+    path = os.path.join(user_upload, filename)
 
     file.save(path)
 
@@ -107,6 +126,9 @@ def upload_rate():
 
     M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
 
+    if M is None:
+        return "Không tìm thấy profile"
+
     h, w = template.shape[:2]
 
     pts = np.float32([[0,0],[0,h],[w,h],[w,0]]).reshape(-1,1,2)
@@ -130,7 +152,9 @@ def upload_rate():
 
     crop = img[rate_y1:rate_y2, rate_x1:rate_x2]
 
-    save = os.path.join(RATE, "rate.png")
+    user_rate = get_user_dir(RATE)
+
+    save = os.path.join(user_rate, "rate.png")
 
     cv2.imwrite(save, crop)
 
@@ -149,7 +173,8 @@ def upload_shop():
     for f in files:
 
         filename = str(uuid.uuid4()) + ".png"
-        path = os.path.join(UPLOAD, filename)
+        user_upload = get_user_dir(UPLOAD)
+        path = os.path.join(user_upload, filename)
 
         f.save(path)
 
@@ -178,7 +203,8 @@ def cut_skin():
     skin_height = 522
     xs = [699,1049,1399,1749,2099]
     
-    shop_paths = request.json["paths"]
+    data = request.json or {}
+    shop_paths = data.get("paths", [])
     
     for shop_path in shop_paths:
         # Kiểm tra file tồn tại
@@ -221,9 +247,13 @@ def cut_skin():
             if score > 0.45:
                 crop = img[top:top+skin_height, x:x+skin_width]
                 name = f"{uuid.uuid4()}.png"
-                path = os.path.join(SKIN, name)
+                user_skin = get_user_dir(SKIN)
+                path = os.path.join(user_skin, name)
                 cv2.imwrite(path, crop)
-                skins.append(name)
+                skins.append({
+                    "name": name,
+                    "url": f"/skins/{session['uid']}/{name}"
+                })
     
     print("Shop paths:", shop_paths)
     print("Template shape:", template.shape)
@@ -283,7 +313,7 @@ def find_profile(bg):
 @app.route("/merge", methods=["POST"])
 def merge():
 
-    global bg_path
+    bg_path = session.get("bg_path")
     try:
         paper_count = int(request.json.get("giay_ts", 0))
     except:
@@ -291,8 +321,9 @@ def merge():
     if bg_path is None:
         return jsonify({"error":"Chưa có background"})
 
-    skins = request.json["skins"]
-    use_chest = request.json.get("ruong_cs", False)
+    data = request.json or {}
+    skins = data.get("skins", [])
+    use_chest = data.get("ruong_cs", False)
     if len(skins) == 0:
         return jsonify({"error":"Chưa có skin"})
 
@@ -303,7 +334,8 @@ def merge():
 
     bg = cv2.resize(bg,(2796,1290))
 
-    rate_path = os.path.join(RATE,"rate.png")
+    user_rate = get_user_dir(RATE)
+    rate_path = os.path.join(user_rate,"rate.png")
 
     if not os.path.exists(rate_path):
         return jsonify({"error":"Chưa có rate"})
@@ -411,7 +443,8 @@ def merge():
     # ===== load skin =====
     for name in skins:
 
-        path = os.path.join(SKIN, name)
+        user_skin = get_user_dir(SKIN)
+        path = os.path.join(user_skin, name)
         skin = cv2.imread(path)
 
         if skin is None:
@@ -501,41 +534,54 @@ def merge():
         ] = paper
 
     name = str(uuid.uuid4()) + ".png"
-    save = os.path.join(RESULT, name)
+    user_result = get_user_dir(RESULT)
+
+    save = os.path.join(user_result, name)
 
     cv2.imwrite(save,bg)
 
     return jsonify({
     "status":"success",
-    "image":f"/result/{name}",
-    "download":f"/download/{name}"
+    "image":f"/result/{session['uid']}/{name}",
+    "download":f"/download/{session['uid']}/{name}"
 })
 
 
 # =============================
 # Download
 # =============================
-@app.route("/download/<filename>")
-def download(filename):
+@app.route("/download/<uid>/<filename>")
+def download(uid, filename):
 
-    path = os.path.join(RESULT, filename)
+    path = os.path.join(RESULT, uid, filename)
 
-    if os.path.exists(path):
-        return send_file(path, as_attachment=True)
+    if not os.path.exists(path):
+        return "Không có ảnh"
 
-    return "Chưa có ảnh"
+    @after_this_request
+    def cleanup(response):
+        try:
+            # xoá toàn bộ dữ liệu của user
+            shutil.rmtree(os.path.join(UPLOAD, uid), ignore_errors=True)
+            shutil.rmtree(os.path.join(SKIN, uid), ignore_errors=True)
+            shutil.rmtree(os.path.join(RATE, uid), ignore_errors=True)
+            shutil.rmtree(os.path.join(RESULT, uid), ignore_errors=True)
+        except Exception as e:
+            print("Cleanup error:", e)
+
+        return response
+
+    return send_file(path, as_attachment=True)
+@app.route("/skins/<uid>/<filename>")
+def show_skin(uid, filename):
+    return send_from_directory(os.path.join(SKIN, uid), filename)
 
 
-@app.route("/skins/<filename>")
-def show_skin(filename):
-    return send_from_directory(SKIN, filename)
-
-
-@app.route("/result/<filename>")
-def show_result(filename):
-    return send_from_directory(RESULT, filename)
+@app.route("/result/<uid>/<filename>")
+def show_result(uid, filename):
+    return send_from_directory(os.path.join(RESULT, uid), filename)
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
