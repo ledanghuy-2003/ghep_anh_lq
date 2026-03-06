@@ -252,7 +252,7 @@ def cut_skin():
                 cv2.imwrite(path, crop)
                 skins.append({
                     "name": name,
-                    "url": f"/skins/{session['uid']}/{name}"
+                    "url": f"/skins/{get_user_id()}/{name}"
                 })
     
     print("Shop paths:", shop_paths)
@@ -462,6 +462,10 @@ def merge():
         )
     # ===== load skin =====
     for name in skins:
+
+        if name is None or name == "":
+            print("Skin name lỗi:", name)
+            continue
 
         user_skin = get_user_dir(SKIN)
         path = os.path.join(user_skin, name)
