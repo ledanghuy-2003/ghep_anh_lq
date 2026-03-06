@@ -165,8 +165,7 @@ def upload_shop():
 # =============================
 @app.route("/cut_skin", methods=["POST"])
 def cut_skin():
-    global skins
-    skins.clear()
+    skins = []
     
     template_path = os.path.join(BASE_DIR, "sohuu.png")
     template = cv2.imread(template_path)
@@ -501,24 +500,25 @@ def merge():
             paper_x:paper_x+paper.shape[1]
         ] = paper
 
-    save = os.path.join(RESULT,"final.png")
+    name = str(uuid.uuid4()) + ".png"
+    save = os.path.join(RESULT, name)
 
     cv2.imwrite(save,bg)
 
     return jsonify({
-        "status":"success",
-        "image":"/result/final.png",
-        "download":"/download"
-    })
+    "status":"success",
+    "image":f"/result/{name}",
+    "download":f"/download/{name}"
+})
 
 
 # =============================
 # Download
 # =============================
-@app.route("/download")
-def download():
+@app.route("/download/<filename>")
+def download(filename):
 
-    path = os.path.join(RESULT,"final.png")
+    path = os.path.join(RESULT, filename)
 
     if os.path.exists(path):
         return send_file(path, as_attachment=True)
