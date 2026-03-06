@@ -1,4 +1,3 @@
-from tempfile import template
 from flask import Flask, render_template, request, send_file, jsonify
 from flask import send_from_directory
 import cv2
