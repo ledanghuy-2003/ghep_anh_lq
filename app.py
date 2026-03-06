@@ -323,6 +323,7 @@ def merge():
 
     data = request.json or {}
     skins = data.get("skins", [])
+    use_email = data.get("email", False)
     use_chest = data.get("ruong_cs", False)
     if len(skins) == 0:
         return jsonify({"error":"Chưa có skin"})
@@ -388,6 +389,25 @@ def merge():
     border = 5
     start_x = left_margin
 
+    email_img = None
+    # load email
+
+    if use_email:
+
+        email_path = os.path.join(BASE_DIR,"email.png")
+
+        if os.path.exists(email_path):
+
+            email_img = cv2.imread(email_path)
+
+            email_img = cv2.resize(email_img,(800,130))
+
+            email_img = cv2.copyMakeBorder(
+                email_img,
+                5,5,5,5,
+                cv2.BORDER_CONSTANT,
+                value=(255,255,255)
+            )
     # ===== load rương cs =====
     chest = None
 
@@ -472,6 +492,63 @@ def merge():
         bg[y:y+h, x:x+w] = skin
 
 
+    # ===== ghép email =====
+    if email_img is not None and len(skins_data) > 0:
+
+        first_skin = skins_data[0]
+
+        h, w = first_skin.shape[:2]
+
+        first_x = start_x
+        first_y = bg.shape[0] - h - bottom_margin
+
+        email_x = first_x
+
+        # nếu có rương hoặc giấy
+        if chest is not None or paper is not None:
+
+            # vị trí rương
+            if chest is not None:
+                chest_x = first_x
+                chest_y = first_y - chest.shape[0] - 15
+
+            # vị trí giấy
+            if paper is not None:
+
+                if chest is not None:
+                    paper_x = chest_x + chest.shape[1] + 10
+                    paper_y = chest_y
+                else:
+                    paper_x = first_x
+                    paper_y = first_y - paper.shape[0] - 15
+
+            # ===== email nằm dưới cùng của khối =====
+            bottom_block = first_y
+
+            if chest is not None:
+                bottom_block = max(bottom_block, chest_y + chest.shape[0])
+
+            if paper is not None:
+                bottom_block = max(bottom_block, paper_y + paper.shape[0])
+
+            email_y = first_y - email_img.shape[0] - 15
+
+            # đặt email bên phải khối
+            if paper is not None:
+                email_x = paper_x + paper.shape[1] + 10
+            elif chest is not None:
+                email_x = chest_x + chest.shape[1] + 10
+
+        else:
+
+            email_y = first_y - email_img.shape[0] - 15
+
+
+        bg[
+            email_y:email_y+email_img.shape[0],
+            email_x:email_x+email_img.shape[1]
+        ] = email_img
+
     # ===== ghép rương chung sức =====
     if chest is not None and len(skins_data) > 0:
 
@@ -487,21 +564,6 @@ def merge():
 
         bg[chest_y:chest_y+chest.shape[0], chest_x:chest_x+chest.shape[1]] = chest
 
-        # viền trắng 5px full
-        skin = cv2.copyMakeBorder(
-            skin,
-            border, border, border, border,
-            cv2.BORDER_CONSTANT,
-            value=(255,255,255)
-        )
-
-        h, w = skin.shape[:2]
-
-        # khoảng cách giữa các skin chỉ 5px
-        x = start_x + i * (w - border*2 + gap)
-        y = bg.shape[0] - h - bottom_margin
-
-        bg[y:y+h, x:x+w] = skin
 
     # ===== ghép giấy tuyệt sắc =====
 

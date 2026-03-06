@@ -130,7 +130,10 @@ img{
 <div class="box">
 
 <div class="box">
-
+<label style="font-size:18px;">
+<input type="checkbox" id="email">
+Ảnh Email
+</label>
 <label style="font-size:18px;">
 <input type="checkbox" id="ruong_cs">
 Ảnh rương chung sức
@@ -197,7 +200,6 @@ document.getElementById("bgPreview").src = URL.createObjectURL(f)
 /* =========================
 Upload Rate
 ========================= */
-
 document.getElementById("rate").onchange = async function(){
 
 let f = this.files[0]
@@ -297,11 +299,11 @@ let box = document.createElement("div")
 box.className = "skin-box"
 
 let img = document.createElement("img")
-img.src = "/skins/" + s
+img.src=s.url 
 img.className = "skin"
 
 box.draggable = true
-box.dataset.name = s
+box.dataset.name = s.name
 
 box.addEventListener("dragstart", dragStart)
 box.addEventListener("dragover", dragOver)
@@ -340,13 +342,15 @@ document.querySelectorAll("#skinList .skin-box").forEach(box=>{
 
 let ruong = document.getElementById("ruong_cs").checked
 let giay = document.getElementById("giay_ts").value
+let email = document.getElementById("email").checked
 let r = await fetch("/merge",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
         skins:skins,
         ruong_cs:ruong,
-        giay_ts:giay
+        giay_ts:giay,
+        email:email
     })
 })
 
