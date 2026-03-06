@@ -130,6 +130,10 @@ img{
 <div class="box">
 
 <div class="box">
+<label style="font-size:18px;">
+<input type="checkbox" id="email">
+Ảnh Email
+</label>
 
 <label style="font-size:18px;">
 <input type="checkbox" id="ruong_cs">
@@ -334,20 +338,23 @@ async function merge(){
 
 let skins = []
 
-document.querySelectorAll("#skinList .skin-box").forEach(box=>{
-    skins.push(box.dataset.name)
+document.querySelectorAll(".skin").forEach(e=>{
+skins.push(e.dataset.name)
 })
 
-let ruong = document.getElementById("ruong_cs").checked
-let giay = document.getElementById("giay_ts").value
-let r = await fetch("/merge",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-        skins:skins,
-        ruong_cs:ruong,
-        giay_ts:giay
-    })
+let ruong_cs = document.getElementById("ruong_cs").checked
+let giay_ts = document.getElementById("giay_ts").value
+let email = document.getElementById("email").checked
+
+let res = await fetch("/merge",{
+method:"POST",
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({
+skins:skins,
+ruong_cs:ruong_cs,
+giay_ts:giay_ts,
+email:email
+})
 })
 
 let data = await r.json()
