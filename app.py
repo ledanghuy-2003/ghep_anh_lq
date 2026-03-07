@@ -12,10 +12,10 @@ import os
 import uuid
 import tempfile
 import glob
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+
 app = Flask(__name__)
 app.secret_key = "secret123"
-
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("skins", exist_ok=True)
 os.makedirs("result", exist_ok=True)
