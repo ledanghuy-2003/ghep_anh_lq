@@ -12,7 +12,7 @@ import os
 import uuid
 import tempfile
 import glob
-
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 app = Flask(__name__)
 app.secret_key = "secret123"
 
@@ -221,6 +221,11 @@ def cut_skin():
             continue
             
         img = cv2.imread(shop_path)
+
+        # resize ảnh lớn để xử lý nhanh hơn
+        if img.shape[1] > 2000:
+            scale = 2000 / img.shape[1]
+            img = cv2.resize(img, None, fx=scale, fy=scale)
         if img is None:
             print(f"Không đọc được ảnh: {shop_path}")
             continue
@@ -275,7 +280,7 @@ def find_profile(bg):
     template_path = os.path.join(BASE_DIR, "profile.png")
     template = cv2.imread(template_path)
 
-    orb = cv2.ORB_create(2000)
+    orb = cv2.ORB_create(800)
 
     kp1, des1 = orb.detectAndCompute(template, None)
     kp2, des2 = orb.detectAndCompute(bg, None)
@@ -325,8 +330,10 @@ def cut_tbha():
 
     uid = str(uuid.uuid4())
 
-    upload_path = f"uploads/{uid}.png"
-    save_path = f"result/{uid}_tbha.png"
+    uid = get_user_id()
+
+    upload_path = os.path.join(UPLOAD, uid + "_tbha.png")
+    save_path = os.path.join(RESULT, uid + "_tbha.png")
 
     file.save(upload_path)
 
@@ -854,9 +861,6 @@ def download(uid, filename):
         return response
 
     return send_file(path, as_attachment=True)
-@app.route("/skins/<uid>/<filename>")
-def show_skin(uid, filename):
-    return send_from_directory(os.path.join(SKIN, uid), filename)
 
 
 @app.route("/result/<uid>/<filename>")
