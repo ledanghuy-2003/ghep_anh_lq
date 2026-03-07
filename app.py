@@ -258,8 +258,7 @@ def cut_skin():
         points = sorted(points, key=lambda p: p[1])
         x_mid, y_mid = points[len(points)//2]
         offset = 604 - th
-        if top < 0:
-            top = 0
+        top = y_mid - offset
 
         for x in xs:
             check = img[top+skin_height-20:top+skin_height+140, x:x+skin_width]
@@ -269,18 +268,12 @@ def cut_skin():
 
             res = cv2.matchTemplate(check, template, cv2.TM_CCOEFF_NORMED)
             score = np.max(res)
+
             if score > 0.45:
                 crop = img[top:top+skin_height, x:x+skin_width]
-                if crop.shape[0] < 100 or crop.shape[1] < 100:
-                    continue
-
-                if crop.size == 0:
-                    continue
-
                 name = f"{uuid.uuid4()}.png"
                 user_skin = get_user_dir(SKIN)
                 path = os.path.join(user_skin, name)
-
                 cv2.imwrite(path, crop)
                 skins.append({
                     "name": name,
