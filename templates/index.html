@@ -3,70 +3,8 @@
 
 <head>
 <title>Tool Ghép Skin</title>
-
-<style>
-
-body{
-    font-family: Arial;
-    background:#f2f2f2;
-    text-align:center;
-}
-
-.container{
-    width:90%;
-    margin:auto;
-}
-
-.box{
-    background:white;
-    padding:20px;
-    margin:20px auto;
-    border-radius:10px;
-    box-shadow:0 0 10px rgba(0,0,0,0.1);
-}
-
-button{
-    padding:10px 20px;
-    border:none;
-    background:#4CAF50;
-    color:white;
-    border-radius:6px;
-    cursor:pointer;
-    font-size:16px;
-}
-
-button:hover{
-    background:#45a049;
-}
-
-img{
-    margin:10px;
-    border-radius:8px;
-}
-
-.preview{
-    max-width:300px;
-}
-
-.skin-list{
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:center;
-}
-
-.skin{
-    width:150px;
-    margin:10px;
-    border:3px solid white;
-}
-
-.result{
-    max-width:90%;
-}
-
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 
 <body>
 
@@ -75,32 +13,30 @@ img{
 <h1>Tool Ghép Skin Liên Quân</h1>
 
 
-<div class="box">
+<div class="row">
+
+<div class="box half">
 
 <h3>Ảnh nền</h3>
 
 <input type="file" id="bg">
-
 <br>
-
 <img id="bgPreview" class="preview">
 
 </div>
 
 
-
-<div class="box">
+<div class="box half">
 
 <h3>Tỉ lệ thắng</h3>
 
 <input type="file" id="rate">
-
 <br>
-
 <img id="ratePreview" class="preview">
 
 </div>
 
+</div>
 
 
 <div class="box">
@@ -125,8 +61,39 @@ img{
 
 </div>
 
+<div class="row">
+
+<div class="box half">
+
+<h3>Thông báo hạ</h3>
+
+<input type="file" id="tbha">
+<br>
+<img id="tbhaPreview" class="preview">
+
+</div>
 
 
+<div class="box half">
+
+<h3>Nút hiệu ứng</h3>
+
+<input type="file" id="nut">
+<br>
+<img id="nutPreview" class="preview">
+
+</div>
+
+</div>
+
+<button onclick="loadSkins()">Hiển thị Skin</button>
+
+<div id="skinSelect"></div>
+<button onclick="mergeIcon()">Ghép Nút + Thông Báo Hạ</button>
+
+<br><br>
+
+<div id="iconResult"></div>
 <div class="box">
 
 <div class="box">
@@ -175,7 +142,7 @@ style="padding:6px;font-size:16px;width:120px"
 
 let shopPaths = []
 
-
+let mode = ""
 
 /* =========================
 Upload Background
@@ -264,16 +231,61 @@ for(let f of this.files){
 
 }
 
+function mergeIcon(){
+
+    if(!confirm("Bạn có chắc muốn ghép Nút + Thông Báo Hạ không?")){
+        return
+    }
+
+    let skins = getSelectedSkins()
+
+    if(skins.length == 0){
+        alert("Hãy chọn skin trước")
+        return
+    }
+
+    fetch("/merge_skin",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            skins:skins
+        })
+    })
+    .then(r=>r.blob())
+    .then(img=>{
+
+        alert("Ghép icon thành công!")
+
+        let url = URL.createObjectURL(img)
+
+        // xoá ảnh cũ
+        document.getElementById("iconResult").innerHTML = ""
+
+        // thêm ảnh mới
+        document.getElementById("iconResult").innerHTML =
+        `<img src="${url}">`
+
+    })
+
+}
+
 /* =========================
 Cắt Skin
 ========================= */
 
 async function cutSkin(){
 
+if(!confirm("Bạn có chắc muốn cắt skin không?")){
+return
+}
+
 if(shopPaths.length === 0){
 alert("Chưa upload ảnh shop")
 return
 }
+
 let r = await fetch("/cut_skin",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
@@ -282,15 +294,14 @@ body:JSON.stringify({paths:shopPaths})
 
 let data = await r.json()
 
-console.log("Cut skin:",data)
-
 if(data.error){
 alert(data.error)
 return
 }
 
-let div = document.getElementById("skinList")
+alert("Cắt ảnh thành công!")
 
+let div = document.getElementById("skinList")
 div.innerHTML=""
 
 for(let s of data.skins){
@@ -299,7 +310,7 @@ let box = document.createElement("div")
 box.className = "skin-box"
 
 let img = document.createElement("img")
-img.src=s.url 
+img.src=s.url
 img.className = "skin"
 
 box.draggable = true
@@ -323,9 +334,153 @@ box.appendChild(remove)
 div.appendChild(box)
 
 }
+}
+
+
+/* =========================
+Upload + Cut Thông Báo Hạ
+========================= */
+
+document.getElementById("tbha").onchange = async function(){
+
+let f = this.files[0]
+
+let form = new FormData()
+
+form.append("image",f)
+
+let r = await fetch("/cut_tbha",{
+method:"POST",
+body:form
+})
+
+let blob = await r.blob()
+
+document.getElementById("tbhaPreview").src = URL.createObjectURL(blob)
 
 }
 
+
+
+/* =========================
+Upload + Cut Nút
+========================= */
+
+document.getElementById("nut").onchange = async function(){
+
+let f = this.files[0]
+
+let form = new FormData()
+
+form.append("image",f)
+
+let r = await fetch("/cut_nut",{
+method:"POST",
+body:form
+})
+
+let blob = await r.blob()
+
+document.getElementById("nutPreview").src = URL.createObjectURL(blob)
+
+}
+let skins = []
+let cutMode = false
+let iconImage = null
+
+function loadSkins(){
+
+    fetch("/get_skins")
+    .then(res => res.json())
+    .then(data => {
+
+        let div = document.getElementById("skinSelect")
+
+        // Xóa danh sách cũ để tránh trùng
+        div.innerHTML = ""
+
+        data.forEach(skin => {
+
+            let box = document.createElement("div")
+            box.className = "skin-item"
+
+            box.innerHTML = `
+                <img src="${skin.url}">
+                <br>
+                <input type="checkbox" class="skinCheck" value="${skin.name}">
+            `
+
+            div.appendChild(box)
+
+        })
+
+    })
+}
+
+
+
+function getSelectedSkins(){
+
+    let skins = []
+
+    document.querySelectorAll(".skinCheck:checked").forEach(cb=>{
+        skins.push(cb.value)
+    })
+
+    return skins
+}
+
+function showNut(){
+
+    let skins = getSelectedSkins()
+
+    if(skins.length == 0){
+        alert("Hãy chọn skin trước")
+        return
+    }
+
+    fetch("/merge_skin",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            skins:skins,
+            type:"nut"
+        })
+    })
+    .then(r=>r.blob())
+    .then(img=>{
+        document.getElementById("result").src = URL.createObjectURL(img)
+    })
+
+}
+
+function showTBHa(){
+
+    let skins = getSelectedSkins()
+
+    if(skins.length == 0){
+        alert("Hãy chọn skin trước")
+        return
+    }
+
+    fetch("/merge_skin",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            skins:skins,
+            type:"tbha"
+        })
+    })
+    .then(r=>r.blob())
+    .then(img=>{
+        document.getElementById("result").src = URL.createObjectURL(img)
+    })
+
+}
 
 
 /* =========================
@@ -334,32 +489,39 @@ Ghép ảnh
 
 async function merge(){
 
+if(!confirm("Bạn có chắc muốn ghép ảnh không?")){
+return
+}
+
 let skins = []
 
 document.querySelectorAll("#skinList .skin-box").forEach(box=>{
-    skins.push(box.dataset.name)
+skins.push(box.dataset.name)
 })
 
 let ruong = document.getElementById("ruong_cs").checked
 let giay = document.getElementById("giay_ts").value
 let email = document.getElementById("email").checked
+
 let r = await fetch("/merge",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-        skins:skins,
-        ruong_cs:ruong,
-        giay_ts:giay,
-        email:email
-    })
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+skins:skins,
+ruong_cs:ruong,
+giay_ts:giay,
+email:email
+})
 })
 
 let data = await r.json()
 
 if(data.error){
-    alert(data.error)
-    return
+alert(data.error)
+return
 }
+
+alert("Ghép ảnh thành công!")
 
 document.getElementById("result").src = data.image + "?" + Date.now()
 
@@ -367,6 +529,7 @@ document.getElementById("download").innerHTML =
 `<a href="${data.download}">
 <button>Tải ảnh xuống</button>
 </a>`
+
 }
 let dragItem = null
 

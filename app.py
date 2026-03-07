@@ -1,4 +1,6 @@
 from flask import Flask, render_template, request, send_file, jsonify, session
+from cut_effect import auto_cut
+from detect_effect import detect_icon
 from flask import after_this_request
 import shutil
 from flask import send_from_directory
@@ -9,6 +11,7 @@ import numpy as np
 import os
 import uuid
 import tempfile
+import glob
 
 app = Flask(__name__)
 app.secret_key = "secret123"
@@ -24,6 +27,7 @@ SKIN = os.path.join(BASE_DIR, "skins")
 RATE = os.path.join(BASE_DIR, "rate")
 RESULT = os.path.join(BASE_DIR, "result")
 temp_dir = tempfile.mkdtemp()
+
 
 for f in [UPLOAD, SKIN, RATE, RESULT]:
     os.makedirs(f, exist_ok=True)
@@ -191,7 +195,11 @@ def upload_shop():
 @app.route("/cut_skin", methods=["POST"])
 def cut_skin():
     skins = []
-    
+    user_skin = get_user_dir(SKIN)
+     # XÓA toàn bộ skin cũ
+    for f in os.listdir(user_skin):
+        os.remove(os.path.join(user_skin, f))
+
     template_path = os.path.join(BASE_DIR, "sohuu.png")
     template = cv2.imread(template_path)
     
@@ -254,6 +262,7 @@ def cut_skin():
                     "name": name,
                     "url": f"/skins/{session['uid']}/{name}"
                 })
+           
     
     print("Shop paths:", shop_paths)
     print("Template shape:", template.shape)
@@ -307,6 +316,209 @@ def find_profile(bg):
 
     return x1,y1,x2,y2
 
+
+
+@app.route("/cut_tbha", methods=["POST"])
+def cut_tbha():
+
+    file = request.files["image"]
+
+    uid = str(uuid.uuid4())
+
+    upload_path = f"uploads/{uid}.png"
+    save_path = f"result/{uid}_tbha.png"
+
+    file.save(upload_path)
+
+    template_path = os.path.join(BASE_DIR, "tbha_template.png")
+
+    success = auto_cut(
+        upload_path,
+        template_path,
+        save_path
+    )
+
+    if not success:
+        return jsonify({"error": "Không tìm thấy thông báo hạ"}), 400
+
+    return send_file(save_path, mimetype="image/png")
+
+@app.route("/cut_nut", methods=["POST"])
+def cut_nut():
+
+    file = request.files["image"]
+
+    uid = str(uuid.uuid4())
+
+    upload_path = f"uploads/{uid}.png"
+    save_path = f"result/{uid}_nut.png"
+
+    file.save(upload_path)
+
+    success = detect_icon(upload_path, "nut", save_path)
+
+    if not success:
+        return jsonify({"error": "Không tìm thấy nút"}), 400
+
+    return send_file(save_path, mimetype="image/png")
+
+
+@app.route("/merge_icon", methods=["POST"])
+def merge_icon():
+
+    skin = request.files["skin"]
+    icon_file = request.files["icon"]
+
+    uid = str(uuid.uuid4())
+
+    skin_path = f"uploads/{uid}_skin.png"
+    icon_path = f"uploads/{uid}_icon.png"
+    save_path = f"result/{uid}_merged.png"
+
+    skin.save(skin_path)
+    icon_file.save(icon_path)
+
+    skin_img = cv2.imread(skin_path)
+
+    # đọc icon
+    icon = cv2.imread(icon_path, cv2.IMREAD_UNCHANGED)
+
+    # resize về 100x100
+    icon = cv2.resize(icon, (100,100))
+
+    # vẽ viền vàng
+    icon = cv2.copyMakeBorder(
+        icon,
+        3,3,3,3,
+        cv2.BORDER_CONSTANT,
+        value=(0,255,255)
+    )
+
+    h, w = skin_img.shape[:2]
+
+    # vị trí ghép
+    x = w - 120
+    y = h - 120
+
+    # ghép icon
+    skin_img[y:y+100, x:x+100] = icon
+
+    cv2.imwrite(save_path, skin_img)
+
+    return send_file(save_path, mimetype="image/png")
+
+@app.route("/get_skins")
+def get_skins():
+
+    uid = session.get("uid")
+
+    user_skin = os.path.join("skins", uid)
+
+    if not os.path.exists(user_skin):
+        return jsonify([])
+
+    files = os.listdir(user_skin)
+
+    skins = []
+
+    for f in files:
+        skins.append({
+            "name": f,
+            "url": f"/skins/{uid}/{f}"
+        })
+
+    return jsonify(skins)
+
+@app.route("/skins/<uid>/<filename>")
+def serve_skin(uid, filename):
+    return send_from_directory(os.path.join("skins", uid), filename)
+
+@app.route("/merge_skin", methods=["POST"])
+def merge_skin():
+
+    data = request.json or {}
+    skins = data.get("skins", [])
+
+    user_skin = get_user_dir(SKIN)
+
+    # tìm icon mới nhất
+    nut_files = glob.glob("result/*_nut.png")
+    tbha_files = glob.glob("result/*_tbha.png")
+
+    if not nut_files or not tbha_files:
+        return jsonify({"error":"Chưa cắt nút hoặc thông báo hạ"})
+
+    nut_path = sorted(nut_files)[-1]
+    tbha_path = sorted(tbha_files)[-1]
+
+    print("Nut:", nut_path)
+    print("TBHA:", tbha_path)
+
+    nut = cv2.imread(nut_path, cv2.IMREAD_UNCHANGED)
+    tbha = cv2.imread(tbha_path, cv2.IMREAD_UNCHANGED)
+
+    if nut is None or tbha is None:
+        return jsonify({"error":"Không đọc được icon"})
+
+    # resize cố định
+    nut = cv2.resize(nut,(100,75))
+    tbha = cv2.resize(tbha,(200,75))
+
+    # viền vàng
+    nut = cv2.copyMakeBorder(nut,3,3,3,3,cv2.BORDER_CONSTANT,value=(255,255,255))
+    tbha = cv2.copyMakeBorder(tbha,3,3,3,3,cv2.BORDER_CONSTANT,value=(255,255,255))
+
+    results = []
+
+    for skin_name in skins:
+
+        skin_path = os.path.join(user_skin, skin_name)
+
+        if not os.path.exists(skin_path):
+            continue
+
+        skin = cv2.imread(skin_path)
+
+        if skin is None:
+            continue
+
+        # vị trí ghép
+        h_skin, w_skin = skin.shape[:2]
+
+        # vị trí
+        x1 = 18
+        y1 = 290
+
+        x2 = 108
+        y2 = 290
+
+    # resize nếu vượt skin
+        if x1 + nut.shape[1] > w_skin:
+            nut = cv2.resize(nut, (w_skin - x1 - 5, nut.shape[0]))
+
+        if x2 + tbha.shape[1] > w_skin:
+            tbha = cv2.resize(tbha, (w_skin - x2 - 5, tbha.shape[0]))
+
+        # ghép
+        skin[y1:y1+nut.shape[0], x1:x1+nut.shape[1]] = nut
+        skin[y2:y2+tbha.shape[0], x2:x2+tbha.shape[1]] = tbha
+
+        new_name = f"{uuid.uuid4()}.png"
+        save = os.path.join(user_skin, new_name)
+
+        cv2.imwrite(save, skin)
+
+        # lưu mapping skin bị thay
+        merged = session.get("merged_skin", {})
+        merged[skin_name] = new_name
+        session["merged_skin"] = merged
+
+        results.append(save)
+
+    if len(results) == 0:
+        return jsonify({"error":"Không merge được skin"})
+
+    return send_file(results[0], mimetype="image/png")
 # =============================
 # Ghép ảnh
 # =============================
@@ -461,10 +673,18 @@ def merge():
             cv2.LINE_AA
         )
     # ===== load skin =====
+    merged = session.get("merged_skin", {})
+
     for name in skins:
 
         user_skin = get_user_dir(SKIN)
-        path = os.path.join(user_skin, name)
+
+        # nếu skin đã ghép icon thì dùng ảnh mới
+        if name in merged:
+            path = os.path.join(user_skin, merged[name])
+        else:
+            path = os.path.join(user_skin, name)
+
         skin = cv2.imread(path)
 
         if skin is None:
@@ -601,7 +821,7 @@ def merge():
     save = os.path.join(user_result, name)
 
     cv2.imwrite(save,bg)
-
+    session.pop("merged_skin", None)
     return jsonify({
     "status":"success",
     "image":f"/result/{session['uid']}/{name}",
