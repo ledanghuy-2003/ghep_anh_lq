@@ -4,6 +4,7 @@ from detect_effect import detect_icon
 from flask import after_this_request
 import shutil
 from flask import send_from_directory
+from cut_skin import cut_skin_process
 import cv2
 cv2.setNumThreads(1)
 cv2.setUseOptimized(True)
@@ -194,99 +195,26 @@ def upload_shop():
 # =============================
 @app.route("/cut_skin", methods=["POST"])
 def cut_skin():
-    skins = []
+
     user_skin = get_user_dir(SKIN)
-     # XÓA toàn bộ skin cũ
+
+    # xoá skin cũ
     for f in os.listdir(user_skin):
         os.remove(os.path.join(user_skin, f))
 
     template_path = os.path.join(BASE_DIR, "sohuu.png")
-    template = cv2.imread(template_path)
-    
-    if template is None:
-        return jsonify({"error": f"Không tìm thấy {template_path}"})
-    
-    th, tw = template.shape[:2]
-    skin_width = 330
-    skin_height = 522
-    xs = [699,1049,1399,1749,2099]
-    
+
     data = request.json or {}
     shop_paths = data.get("paths", [])
-    
-    for shop_path in shop_paths:
-        # Kiểm tra file tồn tại
-        if not os.path.exists(shop_path):
-            print(f"File không tồn tại: {shop_path}")
-            continue
-            
-        img = cv2.imread(shop_path)
-        if img is None:
-            print(f"Không đọc được ảnh: {shop_path}")
-            continue
 
-        try:
-            result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
-            loc = np.where(result >= 0.6)
-            points = list(zip(loc[1], loc[0]))
-
-            # LỌC TEMPLATE TRÙNG
-            filtered = []
-
-            for (x,y) in points:
-
-                duplicate = False
-
-                for (fx,fy) in filtered:
-                    if abs(x-fx) < 80 and abs(y-fy) < 40:
-                        duplicate = True
-                        break
-
-                if not duplicate:
-                    filtered.append((x,y))
-
-            points = filtered
-            
-            if len(points) == 0:
-                print(f"Không tìm thấy template trong ảnh: {shop_path}")
-                continue
-                
-        except Exception as e:
-            print(f"Lỗi khi xử lý ảnh {shop_path}: {str(e)}")
-            continue
-
-        points = sorted(points, key=lambda p: p[1])
-        x_mid, y_mid = points[len(points)//2]
-        offset = 604 - th
-        top = y_mid - offset
-
-        for x in xs:
-            check = img[top+skin_height-20:top+skin_height+140, x:x+skin_width]
-            
-            if check.size == 0:
-                continue
-
-            res = cv2.matchTemplate(check, template, cv2.TM_CCOEFF_NORMED)
-            score = np.max(res)
-
-            if score > 0.45:
-                crop = img[top:top+skin_height, x:x+skin_width]
-                name = f"{uuid.uuid4()}.png"
-                user_skin = get_user_dir(SKIN)
-                path = os.path.join(user_skin, name)
-                cv2.imwrite(path, crop)
-                skins.append({
-                    "name": name,
-                    "url": f"/skins/{session['uid']}/{name}"
-                })
-           
-    
-    print("Shop paths:", shop_paths)
-    print("Template shape:", template.shape)
-    print("Skins found:", len(skins))
+    skins = cut_skin_process(
+        shop_paths,
+        template_path,
+        user_skin,
+        session["uid"]
+    )
 
     return jsonify({"skins": skins})
-
 def find_profile(bg):
 
     template_path = os.path.join(BASE_DIR, "profile.png")
