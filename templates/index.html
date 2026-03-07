@@ -313,6 +313,9 @@ let img = document.createElement("img")
 img.src=s.url
 img.className = "skin"
 
+img.draggable = false
+img.addEventListener("touchstart", e => e.preventDefault())
+
 box.draggable = true
 box.dataset.name = s.name
 
@@ -324,8 +327,26 @@ let remove = document.createElement("div")
 remove.className = "remove"
 remove.innerHTML = "×"
 
-remove.onclick = function(){
-box.remove()
+remove.onclick = async function(){
+
+    if(!confirm("Bạn có chắc muốn xoá skin này không?")){
+        return
+    }
+
+    let name = box.dataset.name
+
+    await fetch("/delete_skin",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            name:name
+        })
+    })
+
+    box.remove()
+
 }
 
 box.appendChild(img)
@@ -532,6 +553,70 @@ document.getElementById("download").innerHTML =
 
 }
 let dragItem = null
+
+/* PC drag */
+
+function dragStart(){
+    dragItem = this
+}
+
+function dragOver(e){
+    e.preventDefault()
+}
+
+function drop(e){
+
+    e.preventDefault()
+
+    if(dragItem !== this){
+
+        let parent = this.parentNode
+
+        parent.insertBefore(dragItem, this)
+
+    }
+
+}
+
+/* MOBILE drag */
+
+let touchItem = null
+
+document.addEventListener("touchstart", function(e){
+
+    let box = e.target.closest(".skin-box")
+
+    if(box){
+        touchItem = box
+    }
+
+})
+
+document.addEventListener("touchmove", function(e){
+
+    if(!touchItem) return
+
+    let touch = e.touches[0]
+
+    let target = document.elementFromPoint(touch.clientX, touch.clientY)
+
+    let box = target.closest(".skin-box")
+
+    if(box && box !== touchItem){
+
+        let parent = box.parentNode
+
+        parent.insertBefore(touchItem, box)
+
+    }
+
+})
+
+document.addEventListener("touchend", function(){
+
+    touchItem = null
+
+})
 
 function dragStart(){
     dragItem = this

@@ -31,9 +31,14 @@ def cut_skin_process(shop_paths, template_path, user_skin, session_uid):
             print("Không đọc được:", shop_path)
             continue
 
-        result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
+        h, w = img.shape[:2]
 
-        loc = np.where(result >= 0.6)
+        # chỉ scan nửa dưới để tránh nhầm chữ phía trên
+        roi = img[int(h*0.45):h, :]
+
+        result = cv2.matchTemplate(roi, template, cv2.TM_CCOEFF_NORMED)
+
+        loc = np.where(result >= 0.55)
 
         points = list(zip(loc[1], loc[0]))
 
@@ -56,9 +61,14 @@ def cut_skin_process(shop_paths, template_path, user_skin, session_uid):
         if len(points) == 0:
             continue
 
+        # sort theo chiều dọc
         points = sorted(points, key=lambda p: p[1])
 
+        # lấy điểm giữa
         x_mid, y_mid = points[len(points)//2]
+
+        # cộng lại offset roi
+        y_mid += int(h*0.45)
 
         offset = 604 - th
 
@@ -78,6 +88,9 @@ def cut_skin_process(shop_paths, template_path, user_skin, session_uid):
             if score > 0.45:
 
                 crop = img[top:top+skin_height, x:x+skin_width]
+
+                if crop.shape[0] != skin_height:
+                    continue
 
                 name = f"{uuid.uuid4()}.png"
 

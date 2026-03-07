@@ -215,6 +215,27 @@ def cut_skin():
     )
 
     return jsonify({"skins": skins})
+
+@app.route("/delete_skin", methods=["POST"])
+def delete_skin():
+
+    data = request.json or {}
+    name = data.get("name")
+
+    if not name:
+        return jsonify({"error":"Thiếu tên skin"})
+
+    uid = session.get("uid")
+
+    user_skin = os.path.join(SKIN, uid)
+
+    path = os.path.join(user_skin, name)
+
+    if os.path.exists(path):
+        os.remove(path)
+
+    return jsonify({"status":"ok"})
+
 def find_profile(bg):
 
     template_path = os.path.join(BASE_DIR, "profile.png")
