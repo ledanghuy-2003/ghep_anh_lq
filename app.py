@@ -436,9 +436,6 @@ def get_skins():
 
     return jsonify(skins)
 
-@app.route("/skins/<uid>/<filename>")
-def serve_skin(uid, filename):
-    return send_from_directory(os.path.join("skins", uid), filename)
 
 @app.route("/merge_skin", methods=["POST"])
 def merge_skin():
@@ -861,6 +858,9 @@ def download(uid, filename):
         return response
 
     return send_file(path, as_attachment=True)
+@app.route("/skins/<uid>/<filename>")
+def show_skin(uid, filename):
+    return send_from_directory(os.path.join(SKIN, uid), filename)
 
 
 @app.route("/result/<uid>/<filename>")
