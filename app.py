@@ -15,7 +15,7 @@ import glob
 
 app = Flask(__name__)
 app.secret_key = "secret123"
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("skins", exist_ok=True)
 os.makedirs("result", exist_ok=True)
@@ -221,11 +221,6 @@ def cut_skin():
             continue
             
         img = cv2.imread(shop_path)
-
-        # resize ảnh lớn để xử lý nhanh hơn
-        if img.shape[1] > 2000:
-            scale = 2000 / img.shape[1]
-            img = cv2.resize(img, None, fx=scale, fy=scale)
         if img is None:
             print(f"Không đọc được ảnh: {shop_path}")
             continue
@@ -280,7 +275,7 @@ def find_profile(bg):
     template_path = os.path.join(BASE_DIR, "profile.png")
     template = cv2.imread(template_path)
 
-    orb = cv2.ORB_create(800)
+    orb = cv2.ORB_create(2000)
 
     kp1, des1 = orb.detectAndCompute(template, None)
     kp2, des2 = orb.detectAndCompute(bg, None)
@@ -330,10 +325,8 @@ def cut_tbha():
 
     uid = str(uuid.uuid4())
 
-    uid = get_user_id()
-
-    upload_path = os.path.join(UPLOAD, uid + "_tbha.png")
-    save_path = os.path.join(RESULT, uid + "_tbha.png")
+    upload_path = f"uploads/{uid}.png"
+    save_path = f"result/{uid}_tbha.png"
 
     file.save(upload_path)
 
@@ -436,6 +429,9 @@ def get_skins():
 
     return jsonify(skins)
 
+@app.route("/skins/<uid>/<filename>")
+def serve_skin(uid, filename):
+    return send_from_directory(os.path.join("skins", uid), filename)
 
 @app.route("/merge_skin", methods=["POST"])
 def merge_skin():
