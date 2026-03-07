@@ -227,8 +227,25 @@ def cut_skin():
 
         try:
             result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
-            loc = np.where(result >= 0.75)
+            loc = np.where(result >= 0.6)
             points = list(zip(loc[1], loc[0]))
+
+            # LỌC TEMPLATE TRÙNG
+            filtered = []
+
+            for (x,y) in points:
+
+                duplicate = False
+
+                for (fx,fy) in filtered:
+                    if abs(x-fx) < 80 and abs(y-fy) < 40:
+                        duplicate = True
+                        break
+
+                if not duplicate:
+                    filtered.append((x,y))
+
+            points = filtered
             
             if len(points) == 0:
                 print(f"Không tìm thấy template trong ảnh: {shop_path}")
