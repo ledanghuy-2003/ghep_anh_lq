@@ -106,6 +106,17 @@
 Ảnh rương chung sức
 </label>
 
+<label style="font-size:18px;">
+<input type="checkbox" id="ruong_wave">
+Ảnh rương Wave
+</label>
+
+<label style="font-size:18px;">
+<input type="checkbox" id="ruong_ss">
+Ảnh rương SS
+</label>
+</label>
+
 <br><br>
 
 <label style="font-size:18px;">
@@ -521,6 +532,8 @@ skins.push(box.dataset.name)
 })
 
 let ruong = document.getElementById("ruong_cs").checked
+let ruong_wave = document.getElementById("ruong_wave").checked
+let ruong_ss = document.getElementById("ruong_ss").checked
 let giay = document.getElementById("giay_ts").value
 let email = document.getElementById("email").checked
 
@@ -530,6 +543,8 @@ headers:{"Content-Type":"application/json"},
 body:JSON.stringify({
 skins:skins,
 ruong_cs:ruong,
+ruong_wave:ruong_wave,
+ruong_ss:ruong_ss,
 giay_ts:giay,
 email:email
 })

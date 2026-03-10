@@ -503,6 +503,8 @@ def merge():
     skins = data.get("skins", [])
     use_email = data.get("email", False)
     use_chest = data.get("ruong_cs", False)
+    use_wave = data.get("ruong_wave", False)
+    use_ss = data.get("ruong_ss", False)
     if len(skins) == 0:
         return jsonify({"error":"Chưa có skin"})
 
@@ -604,6 +606,42 @@ def merge():
             )
 
     skins_data = []
+
+
+    # ===== load rương wave =====
+    chest_wave = None
+
+    if use_wave:
+        wave_path = os.path.join(BASE_DIR, "ruong_wave.png")
+
+        if os.path.exists(wave_path):
+            chest_wave = cv2.imread(wave_path)
+            chest_wave = cv2.resize(chest_wave, (350,300))
+
+            chest_wave = cv2.copyMakeBorder(
+                chest_wave,
+                5,5,5,5,
+                cv2.BORDER_CONSTANT,
+                value=(255,255,255)
+            )
+
+
+    # ===== load rương ss =====
+    chest_ss = None
+
+    if use_ss:
+        ss_path = os.path.join(BASE_DIR, "ruong_ss.png")
+
+        if os.path.exists(ss_path):
+            chest_ss = cv2.imread(ss_path)
+            chest_ss = cv2.resize(chest_ss, (350,300))
+
+            chest_ss = cv2.copyMakeBorder(
+                chest_ss,
+                5,5,5,5,
+                cv2.BORDER_CONSTANT,
+                value=(255,255,255)
+            )
     # ===== load gts =====
     paper = None
 
@@ -688,98 +726,146 @@ def merge():
         first_x = start_x
         first_y = bg.shape[0] - h - bottom_margin
 
-        email_x = first_x
+        start_box_x = first_x
+        start_box_y = first_y - 315
 
-        # nếu có rương hoặc giấy
-        if chest is not None or paper is not None:
+        offset_x = 0
+        space = 15
 
-            # vị trí rương
-            if chest is not None:
-                chest_x = first_x
-                chest_y = first_y - chest.shape[0] - 15
-
-            # vị trí giấy
-            if paper is not None:
-
-                if chest is not None:
-                    paper_x = chest_x + chest.shape[1] + 10
-                    paper_y = chest_y
-                else:
-                    paper_x = first_x
-                    paper_y = first_y - paper.shape[0] - 15
-
-            # ===== email nằm dưới cùng của khối =====
-            bottom_block = first_y
-
-            if chest is not None:
-                bottom_block = max(bottom_block, chest_y + chest.shape[0])
-
-            if paper is not None:
-                bottom_block = max(bottom_block, paper_y + paper.shape[0])
-
-            email_y = first_y - email_img.shape[0] - 15
-
-            # đặt email bên phải khối
-            if paper is not None:
-                email_x = paper_x + paper.shape[1] + 10
-            elif chest is not None:
-                email_x = chest_x + chest.shape[1] + 10
-
-        else:
-
-            email_y = first_y - email_img.shape[0] - 15
-
-
-        bg[
-            email_y:email_y+email_img.shape[0],
-            email_x:email_x+email_img.shape[1]
-        ] = email_img
-
-    # ===== ghép rương chung sức =====
-    if chest is not None and len(skins_data) > 0:
-
-        first_skin = skins_data[0]
-
-        h, w = first_skin.shape[:2]
-
-        first_x = start_x
-        first_y = bg.shape[0] - h - bottom_margin
-
-        chest_x = first_x
-        chest_y = first_y - chest.shape[0] - 15
-
-        bg[chest_y:chest_y+chest.shape[0], chest_x:chest_x+chest.shape[1]] = chest
-
-
-    # ===== ghép giấy tuyệt sắc =====
-
-    if paper is not None and len(skins_data) > 0:
-
-        first_skin = skins_data[0]
-
-        h, w = first_skin.shape[:2]
-
-        first_x = start_x
-        first_y = bg.shape[0] - h - bottom_margin
+        # ===== tính vị trí rương =====
 
         if chest is not None:
+            offset_x += chest.shape[1] + space
 
-            chest_x = first_x
-            chest_y = first_y - chest.shape[0] - 15
+        if chest_wave is not None:
+            offset_x += chest_wave.shape[1] + space
 
-            paper_x = chest_x + chest.shape[1] + 10
-            paper_y = chest_y
+        if chest_ss is not None:
+            offset_x += chest_ss.shape[1] + space
+
+        # ===== nếu có GTS =====
+        if paper is not None:
+
+            paper_x = start_box_x + offset_x
+            paper_y = start_box_y
+
+            offset_x += paper.shape[1] -10
+
+            email_x = paper_x + paper.shape[1] + space
+            email_y = paper_y
 
         else:
+            # nếu không có GTS thì sau rương
+            email_x = start_box_x + offset_x
+            email_y = start_box_y
 
-            paper_x = first_x
-            paper_y = first_y - paper.shape[0] - 15
+        # ===== kiểm tra đủ chiều ngang không =====
 
+        bottom_block = first_y
+
+        # đáy của hàng rương
+        box_bottom = start_box_y
+
+        if chest is not None:
+            box_bottom = max(box_bottom, start_box_y + chest.shape[0])
+
+        if chest_wave is not None:
+            box_bottom = max(box_bottom, start_box_y + chest_wave.shape[0])
+
+        if chest_ss is not None:
+            box_bottom = max(box_bottom, start_box_y + chest_ss.shape[0])
+
+        if paper is not None:
+            box_bottom = max(box_bottom, start_box_y + paper.shape[0])
+
+        bottom_block = max(bottom_block, box_bottom)
+
+        # email nằm dưới khối
+        email_y = bottom_block -146
+        if email_x + email_img.shape[1] > bg.shape[1] - right_margin:
+
+            # không đủ → đưa lên trên rương
+            email_x = start_box_x
+            email_y = start_box_y - email_img.shape[0] - space
+
+        # ===== ghép email =====
+
+        eh, ew = email_img.shape[:2]
 
         bg[
-            paper_y:paper_y+paper.shape[0],
-            paper_x:paper_x+paper.shape[1]
-        ] = paper
+            email_y:email_y+eh,
+            email_x:email_x+ew
+        ] = email_img
+    # ===== ghép các rương =====
+
+    # ===== AUTO LAYOUT BOX =====
+
+    if len(skins_data) > 0:
+
+        first_skin = skins_data[0]
+
+        h, w = first_skin.shape[:2]
+
+        first_x = start_x
+        first_y = bg.shape[0] - h - bottom_margin
+
+        start_box_x = first_x
+        start_box_y = first_y - 315
+
+        offset_x = 0
+        space = 15
+
+
+        # ===== RƯƠNG CHUNG SỨC =====
+        if chest is not None:
+
+            x = start_box_x + offset_x
+            y = start_box_y
+
+            ch, cw = chest.shape[:2]
+
+            bg[y:y+ch, x:x+cw] = chest
+
+            offset_x += cw + space
+
+
+        # ===== RƯƠNG WAVE =====
+        if chest_wave is not None:
+
+            x = start_box_x + offset_x
+            y = start_box_y
+
+            ch, cw = chest_wave.shape[:2]
+
+            bg[y:y+ch, x:x+cw] = chest_wave
+
+            offset_x += cw + space
+
+
+        # ===== RƯƠNG SS =====
+        if chest_ss is not None:
+
+            x = start_box_x + offset_x
+            y = start_box_y
+
+            ch, cw = chest_ss.shape[:2]
+
+            bg[y:y+ch, x:x+cw] = chest_ss
+
+            offset_x += cw + space
+
+
+        # ===== GIẤY TUYỆT SẮC =====
+        if paper is not None:
+
+            x = start_box_x + offset_x
+            y = start_box_y
+
+            ph, pw = paper.shape[:2]
+
+            bg[y:y+ph, x:x+pw] = paper
+
+            offset_x += pw + space
 
     name = str(uuid.uuid4()) + ".png"
     user_result = get_user_dir(RESULT)
